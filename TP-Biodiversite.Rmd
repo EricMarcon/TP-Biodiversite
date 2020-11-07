@@ -1,0 +1,171 @@
+---
+title: "Estimation de la richesse"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r Do_not_modify, include=FALSE}
+# Installation of packages if necessary
+InstallPackages <- function(Packages) {
+  InstallPackage <- function(Package) {
+    if (!Package %in% installed.packages()[, 1]) {
+      install.packages(Package, repos="https://cran.rstudio.com/")
+    }
+  }
+  invisible(sapply(Packages, InstallPackage))
+}
+
+# Basic packages
+InstallPackages(c("knitr", "learnr", "tidyverse"))
+library("learnr")
+
+# Tidyverse default options
+library("tidyverse")
+# Set ggplotting to bw plot default, but with transparent background elements.  
+theme_set(theme_bw(base_size=12))
+theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
+             plot.background = element_rect(fill = "transparent", colour = NA))
+knitr::opts_chunk$set(dev.args=list(bg="transparent"))
+```
+
+```{r setup, include=FALSE}
+# Packages for this document
+InstallPackages(c("entropart"))
+```
+
+
+
+# Données
+
+## Lecture de la base de Paracou
+
+Inventaire de 2016. 
+La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'avoir les droits suffisants.
+Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées par défaut.
+
+```{r}
+library("tidyverse")
+remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
+library("EcoFoG")
+# Lecture de la base de données
+Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
+  # Arbres vivants seulement
+  filter(Plot==6 & CodeAlive == TRUE) %>% 
+  # Filtrage des colonnes utiles
+  select(idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
+  # Création d'une colonne contenant "Genre espèce".
+  unite(col = spName, Genus, Species, remove = FALSE) -> Paracou6
+# Affichage des données disponibles
+Paracou6
+```
+
+
+## Carte
+
+La carte des wapas de la P6 est créée avec **ggplot2**. 
+
+```{r CarteP6, exercise=TRUE, exercise.eval=TRUE}
+Paracou6 %>% filter(Genus=="Eperua") %>%
+  ggplot() + 
+  geom_point(aes(x = Xfield, y = Yfield, size = CircCorr, color=Species)) + 
+  coord_fixed() + scale_color_brewer(palette = "Set1") +
+  labs(x="X", y="Y", caption="Paracou, parcelle 6", size="Circonférence", color="Espèce")
+```
+## Courbe Rang Abondance
+
+Il faut tout d'abord créer le vecteur des abondances
+
+```{r Comptage, exercise=TRUE, exercise.eval=TRUE}
+# Comptage
+Paracou6 %>% 
+  group_by(spName) %>% 
+  summarize(Abondance = n(), .groups = 'drop') ->
+  # Tibble 
+  tblAbdP6
+# Fabrication d'un vecteur nommé
+AbdP6 <- tblAbdP6$Abondance
+names(AbdP6) <- tblAbdP6$spName
+# Vecteur d'abondances
+library("entropart")
+AbdP6 %>% as.AbdVector -> AbdP6
+```
+
+
+Produire un diagramme de Whitakker avec ggplot, en ajustant une distibution lognormale.
+
+```{r Whitakker, exercise=TRUE, hint=TRUE}
+library("entropart")
+
+```
+
+```{r Whitakker-hint}
+?SpeciesDistribution
+```
+
+
+# Diversité neutre
+
+## Richesse spécifique
+
+Compter le nombre d'espèces à partir du vecteur d'abondance: penser à éliminer les zéros s'il y en a.
+
+```{r Richesse1, exercise=TRUE, hint=TRUE}
+
+
+```
+
+```{r Richesse1-hint}
+length(AbdP6[AbdP6 > 0])
+sum(AbdP6 > 0)
+```
+Combien y a-t-il de singletons et doubletons dans la communauté ?
+
+```{r Singletons, exercise=TRUE, hint=TRUE}
+
+```
+
+```{r Singletons-hint}
+sum(AbdP6 == 1)
+```
+
+Utiliser la fonction `Richness()` de **entropart**.
+```{r Richesse2, exercise=TRUE, exercise.eval=TRUE}
+AbdP6 %>%  Richness(Correction = "None")
+```
+
+Estimer la richesse avec les estimateurs de Chao et Jackknife
+
+```{r Richesse3, exercise=TRUE, hint=TRUE}
+
+```
+
+```{r Richesse3-hint}
+?Richness
+```
+
+
+```{r Richesse-quiz, echo=FALSE}
+quiz(
+  question("Quel est le meilleur estimateur de la richesse de la parcelle 6 ?",
+    answer("Chao"),
+    answer("Jackknife 1"),
+    answer("Jackknife 2"),
+    answer("Jackknife 3",  correct = TRUE),
+    allow_retry = TRUE,
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+  ),
+  question("L'estimation est-elle robuste ?",
+    answer("oui"),
+    answer("non", correct = TRUE),
+    allow_retry = TRUE,
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+  ),
+  question("Pourquoi ?",
+    answer("La richesse est largement sous-estimée"),
+    answer("La variance de l'estimateur augmente avec l'ordre du Jackknife", correct = TRUE),
+    allow_retry = TRUE,
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+  )
+)
+```
+
