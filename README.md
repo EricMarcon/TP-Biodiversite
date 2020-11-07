@@ -1,7 +1,6 @@
 # Mesure de la Biodiversité : Travaux pratiques
 
 ![stability-wip](https://img.shields.io/badge/lifecycle-maturing-blue.svg)
-[![Travis-CI Build Status](https://travis-ci.org/EricMarcon/travailleR.svg?branch=master)](https://travis-ci.org/EricMarcon/travailleR)
 
 Ce TP fonctionne avec **learn**: exécuter le fichier `TP-Biodiversite` dans RStudio.
 
