@@ -16,7 +16,7 @@ InstallPackages <- function(Packages) {
 }
 
 # Basic packages
-InstallPackages(c("knitr", "learnr", "tidyverse", "gridExtra"))
+InstallPackages(c("knitr", "learnr", "tidyverse", "gridExtra", "magrittr"))
 library("learnr")
 
 # Tidyverse default options
@@ -30,7 +30,7 @@ knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 # Packages for this document
-InstallPackages(c("entropart"))
+InstallPackages(c("entropart", "ape", "cluster"))
 ```
 
 
@@ -43,7 +43,7 @@ Inventaire de 2016.
 La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'avoir les droits suffisants.
 Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées par défaut.
 
-```{r}
+```{r, message=FALSE}
 library("tidyverse")
 if (!"EcoFoG" %in% installed.packages()[, 1])
   remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
@@ -53,9 +53,12 @@ Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
   # Arbres vivants seulement
   filter(Plot==6 & CodeAlive == TRUE) %>% 
   # Filtrage des colonnes utiles
-  select(idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
+  select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
+  # Suppression des mentions de sous-espèces
+  # Coupure au premier espace, nouveau champ : species
+  mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
   # Création d'une colonne contenant "Genre espèce".
-  unite(col = spName, Genus, Species, remove = FALSE) -> Paracou6
+  unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
 # Affichage des données disponibles
 Paracou6
 ```
@@ -236,3 +239,303 @@ quiz(
 )
 ```
 
+
+# Diversité phylogénétique et fonctionnelle
+
+## Création d'une phylogénie
+
+Une phylogénie peut être créée à partir de la taxonomie.
+
+```{r, tidy=FALSE, message=FALSE}
+library("ape")
+library("magrittr")
+Paracou6 %>%
+  select(Family, Genus, spName) %>% 
+  # Nécessite des facteurs
+  mutate_if(is.character, as.factor)  %>% 
+  # Création de la phylogénie
+  {as.phylo(~Family/Genus/spName, data=., collapse=FALSE)} %>% 
+  # Longueurs des branches identiques
+  compute.brlen(method=1) %>% 
+  # Fusionner les branches sans divergence
+  collapse.singles %>% 
+  # Transformer les multichotomies en dichotomies
+  multi2di -> 
+  p6Phylo
+```
+Afficher la phylogénie.
+
+```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120}
+
+```
+
+```{r phylogenie-hint}
+p6Phylo %>% plot(type="fan", show.tip.label = FALSE) 
+```
+
+
+## Profil de diversité phylogénétique
+
+Estimer la diversité phylogénétique de Shannon de la parcelle 6 avec le meilleur estimateur et afficher un graphique.
+
+```{r phyShannon, exercise=TRUE, exercise.timelimit=120}
+AbdP6 %>% PhyloDiversity(q=1, Tree=p6Phylo) -> phyShannon6
+phyShannon6 %>% summary
+# Compléter le code
+```
+
+Interpréter ce graphique.
+
+Tracer le profil de diversité phylogénétique.
+Réduire le nombre de points dans `q.seq` et remplacer `autoplot` par `plot` si le temps de calcul autorisé est dépassé.
+
+```{r phyProfil, exercise=TRUE, exercise.timelimit=120}
+CommunityProfile(function(X, ...) PhyloDiversity(X, ...)$Total, 
+                 AbdP6, q.seq=seq(from=0, to=2, by=1), Tree=p6Phylo) %>% 
+  autoplot
+# Choisir la correction
+```
+
+Comparer FD et la richesse spécifique.
+
+
+## Matrice de distances fonctionnelles
+
+Les valeurs de traits individuels proviennent des projets Bridge et sont complétés par des valeurs moyennes par espèce de la littérature compilées dans la base Mariwenn.
+
+Les traits individuels sont la densité du bois et le logarithme de la surface foliaire spécifique (SLA):
+```{r, message=FALSE}
+# Traits individuels
+(read_csv(file="data/ind_traits_MICE.csv") %>% 
+  # Conserver: botanique, densité du bois, SLA
+  select(Family:Species, plot_code, sapwood_dens, log_SLA) %>% 
+  # Créer le nom d'espèce
+  unite(col = spName, Genus, Species, remove = FALSE) %>% 
+  # Regrouper par espèce
+  group_by(Family, Genus, spName) %>% 
+  # Calculer les médianes des traits
+  summarize(DensiteBois = median(sapwood_dens), logSLA = median(log_SLA)) %>% 
+  # Suppression des groupes
+  ungroup -> 
+  TraitsBoisFeuilles)
+```
+
+Les traits par espèce sont la hauteur maximale (95<sup>ème</sup>) centile) et la masse des graines:
+```{r, message=FALSE}
+# Traits par espèce
+(read_csv2(file="data/DataLifeTraits.csv") %>% 
+  # Sélection des traits
+  select(Name, Hauteur, Masse) %>% 
+  # Préparation de la fusion: noms de colonnes identiques
+  rename(spName = Name) %>% 
+  # Masse des graines: facteurs ordonnés 
+  mutate(MasseGraine = ordered(Masse)) %>% 
+  # Suppression de la colonne originale
+  select(-Masse) ->
+  TraitsVie)
+```
+
+La jointure des tables par les valeurs identiques de la colonne `spName` commune aux deux tibbles termine l'opération:
+```{r, message=FALSE}
+TraitsBoisFeuilles %>% 
+  left_join(TraitsVie)->
+  Traits
+```
+
+La liste des traits ne contient pas forcément toutes les espèces de la parcelle 6 (mais en contient des centaines d'autres, inutiles ici).
+Les espèces manquantes doivent être ajoutées:
+```{r}
+EspecesManquantes <- setdiff(names(AbdP6), Traits$spName)
+# Préparation des lignes supplémentaires
+Paracou6 %>% 
+  # Arbres des espèces manquantes
+  filter(spName %in% EspecesManquantes) %>% 
+  # Sélection des colonnes
+  select(Family, Genus, spName) %>% 
+  # Suppression des doublons
+  distinct ->
+  LignesManquantes
+Traits %<>% 
+  # Ajout des lignes manquantes
+  bind_rows(LignesManquantes) %>% 
+  # Famille et genre en facteurs
+  mutate(Family=as.factor(Family), Genus=as.factor(Genus))
+```
+
+Le tableau des traits contient des valeurs manquantes.
+La proportion des données de traits manquantes, pondérées par le nombre d'individus, est calculée:
+```{r}
+# Nombres de traits manquants pour chaque espèce
+apply(Traits, 1, function(x) sum(is.na(x))) %>%
+  # Division par le nombre de traits pour obtenir une proportion
+  `/`(4) %>%
+  # Création d'un tibble à une seule colonne
+  as_tibble_col(column_name="Traitsmanquants") %>%
+  # Ajout au tableau des traits
+  bind_cols(Traits) %>%
+  # Jointure interne avec le tibble des abondances
+  inner_join(tblAbdP6) -> 
+  TraitsP6
+
+# Proportion pondérée des traits manquants
+sum(TraitsP6$Traitsmanquants * TraitsP6$Abondance)/sum(TraitsP6$Abondance)
+```
+
+
+### Remplissage des valeurs manquantes
+
+Les traits manquants sont complétés par la procédure MICE qui prend en compte toute l'information disponible.
+Le tableau des traits le plus complet possible (non limité aux espèces de la parcelle 6) est utilisé:
+```{r, eval=FALSE, echo=TRUE}
+# Remplissage des valeurs manquantes (long calcul)
+library("mice")
+Traits %>% 
+  mice(print=FALSE) %>% 
+  complete %>% 
+  # Sauvegarde 
+  write_csv2("data/traits.csv")
+```
+Le calcul prend plusieurs minutes et n'est donc pas réalisé à chaque exécution du tutoriel.
+Son résultat est lu dans le fichier de sauvegarde:
+```{r, echo=TRUE}
+read_csv2("data/traits.csv") -> Traits
+```
+
+### Création d'une matrice de distance
+
+La distance de Gower (cours: section 6.3) est calculée entre les espèces.
+```{r}
+library("cluster")
+# Utilisation d'un dataframe pour nommer les lignes
+dfTraits <- as.data.frame(Traits)
+rownames(dfTraits) <- Traits$spName
+dfTraits %>% 
+  # Ne garder que les espèces de la P6
+  filter(spName %in% names(AbdP6)) %>% 
+  # Ne garder que les valeurs de traits
+  select(-(Family:spName)) %>% 
+  # Calculer la distance entre lignes
+  daisy(metric="gower") ->
+  DistEspeces
+
+# Distribution des distances
+ggplot(data=data.frame(Distance=as.numeric(DistEspeces))) +
+  geom_density(aes(x=Distance))
+```
+
+La dissimilarité $\mathbf{Z}$ est calculée comme le complément à la distance maximale normalisée:
+```{r}
+# Dissimilarités
+DistEspeces %<>% as.matrix
+Z <- 1 - DistEspeces/max(DistEspeces)
+```
+
+## Profil de diversité fonctionnelle
+
+Afficher le profil de diversité de Leinster et Cobbold.
+
+```{r Dqz, exercise=TRUE, exercise.timelimit=120}
+# Profil de diversité
+CommunityProfile(Dqz, AbdP6, Z=Z) %>% 
+  autoplot
+```
+
+
+```{r phylo-quiz, echo=FALSE}
+quiz(
+  question("Quelles sont les contraintes de l'arbre phylogénétique pour définir la diversité ?",
+    answer("Il doit être ultramétrique", correct = TRUE),
+    answer("Il doit être de hauteur 1"),
+    answer("Il ne doit pas avoir de polytomies", correct = TRUE),
+    allow_retry = TRUE
+  ),
+  question("L'abre peut représenter des distances quelconques, pas forcément une phylogénie",
+    answer("Vrai", correct = TRUE),
+    answer("Faux")
+  ),
+  question("La diversité phylogénétique est la moyenne le long de l'arbre de la diversité à chaque période",
+    answer("Vrai", correct = TRUE),
+    answer("Faux : c'est vrai pour l'entropie, mais la transformation en diversité n'est pas linéaire"),
+    answer("Faux : ce n'est pas vrai pour l'entropie non plus")
+  )
+)
+```
+
+
+
+# Décomposition
+
+## Création d'une métacommunauté
+
+### Préparation d'un dataframe
+
+Chaque carré de la parcelle 6 est considéré comme une communauté locale issue de la méta-communauté constituée par la parcelle entière.
+Un dataframe contenant les espèces en ligne et les communautés en colonnes est d'abord créé.
+
+```{r, echo=TRUE}
+Paracou6 %>% 
+  # Regroupement
+  group_by(SubPlot, spName) %>% 
+  # Nombres d'arbres par espèces et par carré
+  summarize(Abondance = n(), .groups = "drop") %>% 
+  # Une colonne par carré
+  spread(key = SubPlot, value = Abondance, fill=0)  %>% 
+  # Format dataframe pour nommer les lignes
+  as.data.frame ->
+  dfAbdP6Carres
+# Préparation d'une metacommunauté : noms de lignes
+rownames(dfAbdP6Carres) <- dfAbdP6Carres$spName
+# Suppression de la colonne contenant les noms d'espèces
+dfAbdP6Carres <- dfAbdP6Carres[, -1]
+# Nom des colonnes : C1, C2, C3 et C4
+colnames(dfAbdP6Carres) <- paste("C", colnames(dfAbdP6Carres), sep="")
+```
+
+
+### Création de la métacommunauté
+
+La communauté est créée par la fonction `MetaCommunity()`.
+Les noms de lignes du dataframe sont facultatifs mais permettent de savoir à quelle espèce les abondances se rapportent.
+
+```{r MetaCommunity, exercise=TRUE}
+Paracou6MC <- MetaCommunity(dfAbdP6Carres, Weights = colSums(dfAbdP6Carres))
+# Afficher un résumé
+```
+
+Les poids des communautés peuvent être quelconques mais les estimateurs utilisables par la suite sont restreints si les poids ne sont pas les abondances.
+
+
+## Partition de la diversité
+
+Afficher les profils de diversité $\alpha$, $\beta$ et $\gamma$ de la parcelle 6 découpée en carrés.
+Afficher les valeurs.
+
+```{r DivProfile, exercise=TRUE, exercise.timelimit=120}
+Paracou6MC <- MetaCommunity(dfAbdP6Carres, Weights = colSums(dfAbdP6Carres))
+DivProfile(, Paracou6MC, Biased = FALSE, Correction="UnveilJ") -> dp
+dp %>% autoplot
+# Compléter le code
+```
+Attribuer le même poids à toutes les communautés et recalculer la diversité.
+
+```{r divpart-quiz, echo=FALSE}
+quiz(
+  question("Comment sont organisées les données pour créer une métacommunauté ?",
+    answer("Dans un dataframe", correct = TRUE),
+    answer("Dans une matrice"),
+    answer("Une colonne par communauté et une ligne par espèce", correct = TRUE),
+    answer("Une colonne par espèce et une ligne par communauté"),
+    allow_retry = TRUE
+  ),
+  question("La diversité alpha est la moyenne pondérée des diversités des communautés",
+    answer("Vrai", correct = TRUE),
+    answer("Faux"),
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/10-cadre.html#d%C3%A9composition-de-la-diversit%C3%A9)."
+  ),
+  question("La diversité gamma est le produit des diversités alpha et beta",
+    answer("Vrai", correct = TRUE),
+    answer("Faux"),
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/12-chap-DedompHCDT.html)."
+  )
+)
+```
