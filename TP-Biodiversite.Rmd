@@ -45,7 +45,8 @@ Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées p
 
 ```{r}
 library("tidyverse")
-remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
+if (!"EcoFoG" %in% installed.packages()[, 1])
+  remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
 library("EcoFoG")
 # Lecture de la base de données
 Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
@@ -149,7 +150,7 @@ quiz(
   question("Quel est le meilleur estimateur de la richesse de la parcelle 6 ?",
     answer("Chao"),
     answer("Jackknife 1"),
-    answer("Jackknife 2"),
+    answer("Jackknife 2",  correct = TRUE),
     answer("Jackknife 3",  correct = TRUE),
     allow_retry = TRUE,
     incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
