@@ -4,7 +4,7 @@ output: learnr::tutorial
 runtime: shiny_prerendered
 ---
 
-```{r Do_not_modify, include=FALSE}
+```{r Do_not_modify, include=FALSE, message=FALSE, warning=FALSE}
 # Installation of packages if necessary
 InstallPackages <- function(Packages) {
   InstallPackage <- function(Package) {
@@ -16,7 +16,7 @@ InstallPackages <- function(Packages) {
 }
 
 # Basic packages
-InstallPackages(c("knitr", "learnr", "tidyverse"))
+InstallPackages(c("knitr", "learnr", "tidyverse", "gridExtra"))
 library("learnr")
 
 # Tidyverse default options
@@ -28,7 +28,7 @@ theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
 knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 ```
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 # Packages for this document
 InstallPackages(c("entropart"))
 ```
@@ -72,6 +72,8 @@ Paracou6 %>% filter(Genus=="Eperua") %>%
   coord_fixed() + scale_color_brewer(palette = "Set1") +
   labs(x="X", y="Y", caption="Paracou, parcelle 6", size="Circonférence", color="Espèce")
 ```
+
+
 ## Courbe Rang Abondance
 
 Il faut tout d'abord créer le vecteur des abondances
@@ -151,7 +153,7 @@ quiz(
     answer("Chao"),
     answer("Jackknife 1"),
     answer("Jackknife 2",  correct = TRUE),
-    answer("Jackknife 3",  correct = TRUE),
+    answer("Jackknife 3"),
     allow_retry = TRUE,
     incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
   ),
@@ -166,6 +168,70 @@ quiz(
     answer("La variance de l'estimateur augmente avec l'ordre du Jackknife", correct = TRUE),
     allow_retry = TRUE,
     incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+  )
+)
+```
+
+## Diversité
+
+Estimer l'entropie et la diversité de Shannon de la parcelle 6 avec le meilleur estimateur.
+
+```{r Shannon1, exercise=TRUE}
+AbdP6 %>% Shannon()
+AbdP6 %>% Diversity(q=1)
+```
+
+Comparer l'estimation de la diversité avec celles de l'estimateur "ChaoJost" et de l'estimateur naïf.
+
+```{r Shannon2, exercise=TRUE, hint=TRUE}
+AbdP6 %>% Diversity(q=1, Correction="ChaoJost")
+AbdP6 %>% Diversity(q=1, Correction="None")
+```
+
+Le biais d'estimation diminue avec l'ordre de la diversité. 
+Il est très faible pour la diveristé de Simpson: le vérifier.
+
+```{r Diversityq2, exercise=TRUE}
+AbdP6 %>% Diversity(q=2)
+# Compléter le code
+```
+
+
+## Profil de diversité
+
+Tracer le profil de diversité de la parcelle 6 avec le meilleur estimateur.
+
+```{r Profil1, exercise=TRUE}
+CommunityProfile(Diversity, AbdP6) %>% autoplot
+```
+
+Comparer avec le profil estimé naïvement.
+```{r Profil2, exercise=TRUE, message=FALSE}
+CommunityProfile(Diversity, AbdP6) %>% autoplot(LineWidth=2) -> CPbest
+CommunityProfile(Diversity, AbdP6, Correction="None") %>% autoplot -> CPnone
+library("gridExtra")
+grid.arrange(CPbest, CPnone, ncol=2, nrow=1)
+```
+
+```{r Diversite-quiz, echo=FALSE}
+quiz(
+  question("Le biais d'estimation diminue avec l'ordre de la diversité",
+    answer("Vrai",  correct = TRUE),
+    answer("Faux"),
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
+  ),
+  question("Pourquoi ?",
+    answer("L'impact des espèces rares sur la diversité augmente avec q"),
+    answer("L'impact des espèces rares sur la diversité diminue avec q", correct = TRUE),
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
+  ),
+  question("Quelle est la technique d'estimation de l'estimateur UnveilJ",
+    answer("Les probabilités sont estimées avec un modèle élaboré",  correct = TRUE),
+    answer("Les probabilités sont estimées en multipliant les fréquences par le taux de couverture"),
+    answer("Le nombre d'espèces non observées est estimé par le Jackknife", correct = TRUE),
+    answer("Leur distribution est géométrique mais importe peu", correct = TRUE),
+    allow_retry = TRUE,
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
   )
 )
 ```
