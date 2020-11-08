@@ -1,5 +1,5 @@
 ---
-title: "Estimation de la richesse"
+title: "Mesure de la Biodiversité"
 output: learnr::tutorial
 runtime: shiny_prerendered
 ---
@@ -36,6 +36,14 @@ InstallPackages(c("entropart", "ape", "cluster"))
 
 
 # Données
+
+
+## Présentation
+
+Ceci est le support de TP du cours Mesure de la Biodiversité.
+
+Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diaporama](https://ericmarcon.github.io/MesuresBioDiv2/) sont en ligne.
+
 
 ## Lecture de la base de Paracou
 
