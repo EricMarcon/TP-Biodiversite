@@ -224,6 +224,29 @@ library("gridExtra")
 grid.arrange(CPbest, CPnone, ncol=2, nrow=1)
 ```
 
+
+## Raréfaction et extrapolation
+
+La diversité peut être estimée à un niveau arbitraire de l'effort d'échantillonnage ou du taux de couverture.
+
+Estimer le taux de couverture de l'inventaire.
+```{r Coverage, exercise=TRUE}
+Coverage(AbdP6)
+```
+
+Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
+```{r Level, exercise=TRUE}
+Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
+# Estimer la richesse plutôt que Shannon
+```
+
+Tracer la courbe d'accumulation de la richesse jusqu'au double de la taille de l'inventaire.
+```{r DivAC, exercise=TRUE, exercise.timelimit=120}
+AbdP6 %>% DivAC(q=1, n.seq=seq(from=1, to=2*sum(AbdP6), by=100)) %>% autoplot
+# Essayer q=1 et q=2, by=500 pour accélérer le calcul
+```
+
+
 ```{r Diversite-quiz, echo=FALSE}
 quiz(
   question("Le biais d'estimation diminue avec l'ordre de la diversité",
