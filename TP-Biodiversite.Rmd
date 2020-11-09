@@ -34,16 +34,14 @@ InstallPackages(c("entropart", "ape", "cluster"))
 ```
 
 
-
-# Données
-
-
 ## Présentation
 
 Ceci est le support de TP du cours Mesure de la Biodiversité.
 
 Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diaporama](https://ericmarcon.github.io/MesuresBioDiv2/) sont en ligne.
 
+
+# Données
 
 ## Lecture de la base de Paracou
 
