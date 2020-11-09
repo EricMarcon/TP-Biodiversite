@@ -4,7 +4,7 @@ output: learnr::tutorial
 runtime: shiny_prerendered
 ---
 
-```{r Do_not_modify, include=FALSE, message=FALSE, warning=FALSE}
+```{r Do_not_modify, include=FALSE}
 # Installation of packages if necessary
 InstallPackages <- function(Packages) {
   InstallPackage <- function(Package) {
