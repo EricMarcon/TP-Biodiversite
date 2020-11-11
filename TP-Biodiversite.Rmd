@@ -4,7 +4,7 @@ output: learnr::tutorial
 runtime: shiny_prerendered
 ---
 
-```{r Do_not_modify, include=FALSE}
+```{r preparation, include=FALSE}
 # Installation of packages if necessary
 InstallPackages <- function(Packages) {
   InstallPackage <- function(Package) {
@@ -28,7 +28,7 @@ theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
 knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 
 # Packages for this document
-InstallPackages(c("entropart", "ape", "cluster"))
+InstallPackages(c("entropart", "ape", "cluster", "SPECIES"))
 ```
 
 
@@ -153,6 +153,15 @@ Estimer la richesse avec les estimateurs de Chao et Jackknife
 ?Richness
 ```
 
+Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
+Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'indivdus.
+```{r SPECIES, exercise=TRUE, hint=TRUE}
+library("SPECIES")
+AbdP6 %>% AbdFreqCount() %>% jackknife(k=2) %$% CI
+```
+
+"lb" et "ub" sont les bornes inférieures et supérieures.
+
 
 ```{r Richesse-quiz, echo=FALSE}
 quiz(
@@ -196,7 +205,7 @@ AbdP6 %>% Diversity(q=1, Correction="None")
 ```
 
 Le biais d'estimation diminue avec l'ordre de la diversité. 
-Il est très faible pour la diveristé de Simpson: le vérifier.
+Il est très faible pour la diversité de Simpson: le vérifier.
 
 ```{r Diversityq2, exercise=TRUE}
 AbdP6 %>% Diversity(q=2)
@@ -225,16 +234,25 @@ grid.arrange(CPbest, CPnone, ncol=2, nrow=1)
 
 La diversité peut être estimée à un niveau arbitraire de l'effort d'échantillonnage ou du taux de couverture.
 
+Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
+```{r Leveln, exercise=TRUE}
+Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
+# Estimer la richesse plutôt que Shannon
+```
+
 Estimer le taux de couverture de l'inventaire.
 ```{r Coverage, exercise=TRUE}
 Coverage(AbdP6)
 ```
 
-Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
-```{r Level, exercise=TRUE}
-Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
+Estimer la diversité pour un taux de couverture de 99% et la comparer à la diversité asymptotique (taux de couverture de 100%).
+Estimer la richesse pour évaluer le nombre d'espèces correspondant au dernier pourcent de taux de couverture.
+```{r LevelC, exercise=TRUE}
+Diversity(AbdP6, Level=0.99)
+Diversity(AbdP6)
 # Estimer la richesse plutôt que Shannon
 ```
+
 
 Tracer la courbe d'accumulation de la richesse jusqu'au double de la taille de l'inventaire.
 ```{r DivAC, exercise=TRUE, exercise.timelimit=120}
