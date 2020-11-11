@@ -155,7 +155,7 @@ Estimer la richesse avec les estimateurs de Chao et Jackknife
 
 Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
 Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'indivdus.
-```{r SPECIES, exercise=TRUE, hint=TRUE}
+```{r SPECIES, exercise=TRUE}
 library("SPECIES")
 AbdP6 %>% AbdFreqCount() %>% jackknife(k=2) %$% CI
 ```
