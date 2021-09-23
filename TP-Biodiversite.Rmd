@@ -36,7 +36,7 @@ InstallPackages(c("entropart", "ape", "cluster", "SPECIES"))
 
 Ceci est le support de TP du cours Mesure de la Biodiversité.
 
-Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diaporama](https://ericmarcon.github.io/MesuresBioDiv2/) sont en ligne.
+Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diaporama](https://1drv.ms/p/s!Amvhelr37CHjkON49BbVSohLSRe_EA?e=B1yBts) sont en ligne.
 
 
 # Données
@@ -101,14 +101,14 @@ AbdP6 %>% as.AbdVector -> AbdP6
 ```
 
 
-Produire un diagramme de Whitakker avec ggplot, en ajustant une distibution lognormale.
+Produire un diagramme de Whittaker avec ggplot, en ajustant une distribution lognormale.
 
-```{r Whitakker, exercise=TRUE, hint=TRUE}
+```{r Whittaker, exercise=TRUE, hint=TRUE}
 library("entropart")
 
 ```
 
-```{r Whitakker-hint}
+```{r Whittaker-hint}
 ?SpeciesDistribution
 ```
 
@@ -128,6 +128,7 @@ Compter le nombre d'espèces à partir du vecteur d'abondance: penser à élimin
 length(AbdP6[AbdP6 > 0])
 sum(AbdP6 > 0)
 ```
+
 Combien y a-t-il de singletons et doubletons dans la communauté ?
 
 ```{r Singletons, exercise=TRUE, hint=TRUE}
@@ -139,6 +140,7 @@ sum(AbdP6 == 1)
 ```
 
 Utiliser la fonction `Richness()` de **entropart**.
+
 ```{r Richesse2, exercise=TRUE, exercise.eval=TRUE}
 AbdP6 %>%  Richness(Correction = "None")
 ```
@@ -155,6 +157,7 @@ Estimer la richesse avec les estimateurs de Chao et Jackknife
 
 Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
 Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'indivdus.
+
 ```{r SPECIES, exercise=TRUE}
 library("SPECIES")
 AbdP6 %>% AbdFreqCount() %>% jackknife(k=2) %$% CI
@@ -222,6 +225,7 @@ CommunityProfile(Diversity, AbdP6) %>% autoplot
 ```
 
 Comparer avec le profil estimé naïvement.
+
 ```{r Profil2, exercise=TRUE, message=FALSE}
 CommunityProfile(Diversity, AbdP6) %>% autoplot(LineWidth=2) -> CPbest
 CommunityProfile(Diversity, AbdP6, Correction="None") %>% autoplot -> CPnone
@@ -235,18 +239,21 @@ grid.arrange(CPbest, CPnone, ncol=2, nrow=1)
 La diversité peut être estimée à un niveau arbitraire de l'effort d'échantillonnage ou du taux de couverture.
 
 Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
+
 ```{r Leveln, exercise=TRUE}
 Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
 # Estimer la richesse plutôt que Shannon
 ```
 
 Estimer le taux de couverture de l'inventaire.
+
 ```{r Coverage, exercise=TRUE}
 Coverage(AbdP6)
 ```
 
 Estimer la diversité pour un taux de couverture de 99% et la comparer à la diversité asymptotique (taux de couverture de 100%).
 Estimer la richesse pour évaluer le nombre d'espèces correspondant au dernier pourcent de taux de couverture.
+
 ```{r LevelC, exercise=TRUE}
 Diversity(AbdP6, Level=0.99)
 Diversity(AbdP6)
@@ -255,6 +262,7 @@ Diversity(AbdP6)
 
 
 Tracer la courbe d'accumulation de la richesse jusqu'au double de la taille de l'inventaire.
+
 ```{r DivAC, exercise=TRUE, exercise.timelimit=120}
 AbdP6 %>% DivAC(q=1, n.seq=seq(from=1, to=2*sum(AbdP6), by=100)) %>% autoplot
 # Essayer q=1 et q=2, by=500 pour accélérer le calcul
@@ -308,6 +316,7 @@ Paracou6 %>%
   multi2di -> 
   p6Phylo
 ```
+
 Afficher la phylogénie.
 
 ```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120}
@@ -346,9 +355,10 @@ Comparer FD et la richesse spécifique.
 
 ## Matrice de distances fonctionnelles
 
-Les valeurs de traits individuels proviennent des projets Bridge et sont complétés par des valeurs moyennes par espèce de la littérature compilées dans la base Mariwenn.
+Les valeurs de traits individuels proviennent du projet Bridge et sont complétées par des valeurs moyennes par espèce de la littérature compilées dans la base Mariwenn.
 
 Les traits individuels sont la densité du bois et le logarithme de la surface foliaire spécifique (SLA):
+
 ```{r, message=FALSE}
 # Traits individuels
 (read_csv(file="data/ind_traits_MICE.csv") %>% 
@@ -366,6 +376,7 @@ Les traits individuels sont la densité du bois et le logarithme de la surface f
 ```
 
 Les traits par espèce sont la hauteur maximale (95<sup>ème</sup>) centile) et la masse des graines:
+
 ```{r, message=FALSE}
 # Traits par espèce
 (read_csv2(file="data/DataLifeTraits.csv") %>% 
@@ -381,6 +392,7 @@ Les traits par espèce sont la hauteur maximale (95<sup>ème</sup>) centile) et 
 ```
 
 La jointure des tables par les valeurs identiques de la colonne `spName` commune aux deux tibbles termine l'opération:
+
 ```{r, message=FALSE}
 TraitsBoisFeuilles %>% 
   left_join(TraitsVie)->
@@ -389,6 +401,7 @@ TraitsBoisFeuilles %>%
 
 La liste des traits ne contient pas forcément toutes les espèces de la parcelle 6 (mais en contient des centaines d'autres, inutiles ici).
 Les espèces manquantes doivent être ajoutées:
+
 ```{r}
 EspecesManquantes <- setdiff(names(AbdP6), Traits$spName)
 # Préparation des lignes supplémentaires
@@ -409,6 +422,7 @@ Traits %<>%
 
 Le tableau des traits contient des valeurs manquantes.
 La proportion des données de traits manquantes, pondérées par le nombre d'individus, est calculée:
+
 ```{r}
 # Nombres de traits manquants pour chaque espèce
 apply(Traits, 1, function(x) sum(is.na(x))) %>%
@@ -431,6 +445,7 @@ sum(TraitsP6$Traitsmanquants * TraitsP6$Abondance)/sum(TraitsP6$Abondance)
 
 Les traits manquants sont complétés par la procédure MICE qui prend en compte toute l'information disponible.
 Le tableau des traits le plus complet possible (non limité aux espèces de la parcelle 6) est utilisé:
+
 ```{r, eval=FALSE, echo=TRUE}
 # Remplissage des valeurs manquantes (long calcul)
 library("mice")
@@ -440,15 +455,19 @@ Traits %>%
   # Sauvegarde 
   write_csv2("data/traits.csv")
 ```
+
 Le calcul prend plusieurs minutes et n'est donc pas réalisé à chaque exécution du tutoriel.
 Son résultat est lu dans le fichier de sauvegarde:
+
 ```{r, echo=TRUE}
 read_csv2("data/traits.csv") -> Traits
 ```
 
+
 ### Création d'une matrice de distance
 
 La distance de Gower (cours: section 6.3) est calculée entre les espèces.
+
 ```{r}
 library("cluster")
 # Utilisation d'un dataframe pour nommer les lignes
@@ -469,11 +488,13 @@ ggplot(data=data.frame(Distance=as.numeric(DistEspeces))) +
 ```
 
 La dissimilarité $\mathbf{Z}$ est calculée comme le complément à la distance maximale normalisée:
+
 ```{r}
 # Dissimilarités
 DistEspeces %<>% as.matrix
 Z <- 1 - DistEspeces/max(DistEspeces)
 ```
+
 
 ## Profil de diversité fonctionnelle
 
@@ -499,8 +520,8 @@ quiz(
     answer("Faux")
   ),
   question("La diversité phylogénétique est la moyenne le long de l'arbre de la diversité à chaque période",
-    answer("Vrai", correct = TRUE),
-    answer("Faux : c'est vrai pour l'entropie, mais la transformation en diversité n'est pas linéaire"),
+    answer("Vrai"),
+    answer("Faux : c'est vrai pour l'entropie, mais la transformation en diversité n'est pas linéaire", correct = TRUE),
     answer("Faux : ce n'est pas vrai pour l'entropie non plus")
   )
 )
@@ -561,6 +582,7 @@ DivProfile(, Paracou6MC, Biased = FALSE, Correction="UnveilJ") -> dp
 dp %>% autoplot
 # Compléter le code
 ```
+
 Attribuer le même poids à toutes les communautés et recalculer la diversité.
 
 ```{r divpart-quiz, echo=FALSE}
