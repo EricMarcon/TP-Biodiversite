@@ -1,6 +1,9 @@
 ---
 title: "Mesure de la Biodiversité"
-output: learnr::tutorial
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
 runtime: shiny_prerendered
 ---
 
@@ -39,16 +42,17 @@ Ceci est le support de TP du cours Mesure de la Biodiversité.
 Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diaporama](https://1drv.ms/p/s!Amvhelr37CHjkON49BbVSohLSRe_EA?e=B1yBts) sont en ligne.
 
 
-# Données
+## Données
 
-## Lecture de la base de Paracou
+### Lecture de la base de Paracou
 
 Inventaire de 2016. 
 La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'avoir les droits suffisants.
 Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées par défaut.
 
-```{r, message=FALSE}
+```{r setup, message=FALSE}
 library("tidyverse")
+library("entropart")
 if (!"EcoFoG" %in% installed.packages()[, 1])
   remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
 library("EcoFoG")
@@ -68,11 +72,11 @@ Paracou6
 ```
 
 
-## Carte
+### Carte
 
 La carte des wapas de la P6 est créée avec **ggplot2**. 
 
-```{r CarteP6, exercise=TRUE, exercise.eval=TRUE}
+```{r CarteP6, exercise=TRUE}
 Paracou6 %>% filter(Genus=="Eperua") %>%
   ggplot() + 
   geom_point(aes(x = Xfield, y = Yfield, size = CircCorr, color=Species)) + 
@@ -81,11 +85,11 @@ Paracou6 %>% filter(Genus=="Eperua") %>%
 ```
 
 
-## Courbe Rang Abondance
+### Courbe Rang Abondance
 
 Il faut tout d'abord créer le vecteur des abondances
 
-```{r Comptage, exercise=TRUE, exercise.eval=TRUE}
+```{r Comptage}
 # Comptage
 Paracou6 %>% 
   group_by(spName) %>% 
@@ -100,10 +104,12 @@ library("entropart")
 AbdP6 %>% as.AbdVector -> AbdP6
 ```
 
+```{r ComptageVisible, ref.label="Comptage"}
+```
 
 Produire un diagramme de Whittaker avec ggplot, en ajustant une distribution lognormale.
 
-```{r Whittaker, exercise=TRUE, hint=TRUE}
+```{r Whittaker, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
 library("entropart")
 
 ```
@@ -113,13 +119,13 @@ library("entropart")
 ```
 
 
-# Diversité neutre
+## Diversité neutre
 
-## Richesse spécifique
+### Richesse spécifique
 
 Compter le nombre d'espèces à partir du vecteur d'abondance: penser à éliminer les zéros s'il y en a.
 
-```{r Richesse1, exercise=TRUE, hint=TRUE}
+```{r Richesse1, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
 
 
 ```
@@ -131,7 +137,7 @@ sum(AbdP6 > 0)
 
 Combien y a-t-il de singletons et doubletons dans la communauté ?
 
-```{r Singletons, exercise=TRUE, hint=TRUE}
+```{r Singletons, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
 
 ```
 
@@ -141,13 +147,13 @@ sum(AbdP6 == 1)
 
 Utiliser la fonction `Richness()` de **entropart**.
 
-```{r Richesse2, exercise=TRUE, exercise.eval=TRUE}
+```{r Richesse2, exercise.setup="Comptage", exercise=TRUE}
 AbdP6 %>%  Richness(Correction = "None")
 ```
 
 Estimer la richesse avec les estimateurs de Chao et Jackknife
 
-```{r Richesse3, exercise=TRUE, hint=TRUE}
+```{r Richesse3, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
 
 ```
 
@@ -155,10 +161,16 @@ Estimer la richesse avec les estimateurs de Chao et Jackknife
 ?Richness
 ```
 
-Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
-Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'indivdus.
+L'algorithme interne de sélection de l'ordre du Jackknife est celui de Burnham et Overton (1978): le Jacknife d'ordre 2 est choisi si l'hypothèse nulle d'égalité des estimateurs d'ordre 1 et 2 est rejetée au seuil de risque de 5% par défaut (modifiable par l'argument `Alpha`), ce qui est le cas ici. Un ordre supérieur coûte une plus grande variance à l'estimateur: il ne se justifie que si la valeur estimée est significativement différente, ce qui permet d'espérer réduire le biais (la sous-estimation) dû à un ordre trop faible.
+Les critères de Brose et al. (2003) incitent à choisir plutôt le Jackknife d'ordre 1 puisque la proportion de singletons est inférieure à un tiers. 
+Les deux approches sont presque toujours concordantes: nous sommes ici dans un des rares cas où le choix est ambigu.
 
-```{r SPECIES, exercise=TRUE}
+Pour forcer l'ordre 1, l'argument `JackMax=1` peut être utilisé.
+
+Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
+Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'individus.
+
+```{r SPECIES, exercise.setup="Comptage", exercise=TRUE}
 library("SPECIES")
 AbdP6 %>% AbdFreqCount() %>% jackknife(k=2) %$% CI
 ```
@@ -171,18 +183,20 @@ quiz(
   question("Quel est le meilleur estimateur de la richesse de la parcelle 6 ?",
     answer("Chao"),
     answer("Jackknife 1"),
-    answer("Jackknife 2",  correct = TRUE),
+    answer("Jackknife 2"),
+    answer("Jackknife 1 ou 2, le choix n'est pas clair",  correct = TRUE),
     answer("Jackknife 3"),
     allow_retry = TRUE,
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau. \nLe Jacknife 1 est préférable selon Brose et al.(2003) mais l'algorithme de calcul choisit le Jacknife 2."
   ),
   question("L'estimation est-elle robuste ?",
     answer("oui"),
-    answer("non", correct = TRUE),
+    answer("non si le Jackknife 2 est utilisé", correct = TRUE),
     allow_retry = TRUE,
     incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
   ),
   question("Pourquoi ?",
+    answer("Le choix de l'ordre du Jackknife n'est pas clair", correct = TRUE),
     answer("La richesse est largement sous-estimée"),
     answer("La variance de l'estimateur augmente avec l'ordre du Jackknife", correct = TRUE),
     allow_retry = TRUE,
@@ -191,18 +205,18 @@ quiz(
 )
 ```
 
-## Diversité
+### Diversité
 
 Estimer l'entropie et la diversité de Shannon de la parcelle 6 avec le meilleur estimateur.
 
-```{r Shannon1, exercise=TRUE}
+```{r Shannon1, exercise.setup="Comptage", exercise=TRUE}
 AbdP6 %>% Shannon()
 AbdP6 %>% Diversity(q=1)
 ```
 
 Comparer l'estimation de la diversité avec celles de l'estimateur "ChaoJost" et de l'estimateur naïf.
 
-```{r Shannon2, exercise=TRUE, hint=TRUE}
+```{r Shannon2, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
 AbdP6 %>% Diversity(q=1, Correction="ChaoJost")
 AbdP6 %>% Diversity(q=1, Correction="None")
 ```
@@ -210,51 +224,54 @@ AbdP6 %>% Diversity(q=1, Correction="None")
 Le biais d'estimation diminue avec l'ordre de la diversité. 
 Il est très faible pour la diversité de Simpson: le vérifier.
 
-```{r Diversityq2, exercise=TRUE}
+```{r Diversityq2, exercise.setup="Comptage", exercise=TRUE}
 AbdP6 %>% Diversity(q=2)
 # Compléter le code
 ```
 
+La fonction `Diversity()` choisit le meilleur estimateur par défaut, actuellement "UnveilJ". 
+L'ordre du Jackknife appliqué à l'estimation de la richesse ne peut pas être forcé et sera donc 2.
 
-## Profil de diversité
+
+### Profil de diversité
 
 Tracer le profil de diversité de la parcelle 6 avec le meilleur estimateur.
 
-```{r Profil1, exercise=TRUE}
+```{r Profil1, exercise.setup="Comptage", exercise=TRUE}
 CommunityProfile(Diversity, AbdP6) %>% autoplot
 ```
 
 Comparer avec le profil estimé naïvement.
 
-```{r Profil2, exercise=TRUE, message=FALSE}
-CommunityProfile(Diversity, AbdP6) %>% autoplot(LineWidth=2) -> CPbest
+```{r Profil2, exercise.setup="Comptage", exercise=TRUE, message=FALSE}
+CommunityProfile(Diversity, AbdP6) %>% autoplot -> CPbest
 CommunityProfile(Diversity, AbdP6, Correction="None") %>% autoplot -> CPnone
 library("gridExtra")
 grid.arrange(CPbest, CPnone, ncol=2, nrow=1)
 ```
 
 
-## Raréfaction et extrapolation
+### Raréfaction et extrapolation
 
 La diversité peut être estimée à un niveau arbitraire de l'effort d'échantillonnage ou du taux de couverture.
 
 Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
 
-```{r Leveln, exercise=TRUE}
+```{r Leveln, exercise.setup="Comptage", exercise=TRUE}
 Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
 # Estimer la richesse plutôt que Shannon
 ```
 
 Estimer le taux de couverture de l'inventaire.
 
-```{r Coverage, exercise=TRUE}
+```{r Coverage, exercise.setup="Comptage", exercise=TRUE}
 Coverage(AbdP6)
 ```
 
 Estimer la diversité pour un taux de couverture de 99% et la comparer à la diversité asymptotique (taux de couverture de 100%).
 Estimer la richesse pour évaluer le nombre d'espèces correspondant au dernier pourcent de taux de couverture.
 
-```{r LevelC, exercise=TRUE}
+```{r LevelC, exercise.setup="Comptage", exercise=TRUE}
 Diversity(AbdP6, Level=0.99)
 Diversity(AbdP6)
 # Estimer la richesse plutôt que Shannon
@@ -263,7 +280,7 @@ Diversity(AbdP6)
 
 Tracer la courbe d'accumulation de la richesse jusqu'au double de la taille de l'inventaire.
 
-```{r DivAC, exercise=TRUE, exercise.timelimit=120}
+```{r DivAC, exercise.setup="Comptage", exercise=TRUE, exercise.timelimit=120}
 AbdP6 %>% DivAC(q=1, n.seq=seq(from=1, to=2*sum(AbdP6), by=100)) %>% autoplot
 # Essayer q=1 et q=2, by=500 pour accélérer le calcul
 ```
@@ -293,13 +310,13 @@ quiz(
 ```
 
 
-# Diversité phylogénétique et fonctionnelle
+## Diversité phylogénétique
 
-## Création d'une phylogénie
+### Création d'une phylogénie
 
 Une phylogénie peut être créée à partir de la taxonomie.
 
-```{r, tidy=FALSE, message=FALSE}
+```{r p6Phylo, tidy=FALSE, message=FALSE}
 library("ape")
 library("magrittr")
 Paracou6 %>%
@@ -317,9 +334,12 @@ Paracou6 %>%
   p6Phylo
 ```
 
+```{r p6PhyloVisible, ref.label="Comptage"}
+```
+
 Afficher la phylogénie.
 
-```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120}
+```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120, exercise.setup="p6Phylo"}
 
 ```
 
@@ -328,11 +348,11 @@ p6Phylo %>% plot(type="fan", show.tip.label = FALSE)
 ```
 
 
-## Profil de diversité phylogénétique
+### Profil de diversité phylogénétique
 
 Estimer la diversité phylogénétique de Shannon de la parcelle 6 avec le meilleur estimateur et afficher un graphique.
 
-```{r phyShannon, exercise=TRUE, exercise.timelimit=120}
+```{r phyShannon, exercise.setup="p6Phylo", exercise=TRUE, exercise.timelimit=120}
 AbdP6 %>% PhyloDiversity(q=1, Tree=p6Phylo) -> phyShannon6
 phyShannon6 %>% summary
 # Compléter le code
@@ -343,7 +363,7 @@ Interpréter ce graphique.
 Tracer le profil de diversité phylogénétique.
 Réduire le nombre de points dans `q.seq` et remplacer `autoplot` par `plot` si le temps de calcul autorisé est dépassé.
 
-```{r phyProfil, exercise=TRUE, exercise.timelimit=120}
+```{r phyProfil, exercise.setup="p6Phylo", exercise=TRUE, exercise.timelimit=120}
 CommunityProfile(function(X, ...) PhyloDiversity(X, ...)$Total, 
                  AbdP6, q.seq=seq(from=0, to=2, by=1), Tree=p6Phylo) %>% 
   autoplot
@@ -353,47 +373,49 @@ CommunityProfile(function(X, ...) PhyloDiversity(X, ...)$Total,
 Comparer FD et la richesse spécifique.
 
 
-## Matrice de distances fonctionnelles
+## Diversité fonctionnelle
+
+### Matrice de distances fonctionnelles
 
 Les valeurs de traits individuels proviennent du projet Bridge et sont complétées par des valeurs moyennes par espèce de la littérature compilées dans la base Mariwenn.
 
 Les traits individuels sont la densité du bois et le logarithme de la surface foliaire spécifique (SLA):
-
-```{r, message=FALSE}
+  
+```{r TraitsIndividuels, message=FALSE}
 # Traits individuels
 (read_csv(file="data/ind_traits_MICE.csv") %>% 
-  # Conserver: botanique, densité du bois, SLA
-  select(Family:Species, plot_code, sapwood_dens, log_SLA) %>% 
-  # Créer le nom d'espèce
-  unite(col = spName, Genus, Species, remove = FALSE) %>% 
-  # Regrouper par espèce
-  group_by(Family, Genus, spName) %>% 
-  # Calculer les médianes des traits
-  summarize(DensiteBois = median(sapwood_dens), logSLA = median(log_SLA)) %>% 
-  # Suppression des groupes
-  ungroup -> 
-  TraitsBoisFeuilles)
+    # Conserver: botanique, densité du bois, SLA
+    select(Family:Species, plot_code, sapwood_dens, log_SLA) %>% 
+    # Créer le nom d'espèce
+    unite(col = spName, Genus, Species, remove = FALSE) %>% 
+    # Regrouper par espèce
+    group_by(Family, Genus, spName) %>% 
+    # Calculer les médianes des traits
+    summarize(DensiteBois = median(sapwood_dens), logSLA = median(log_SLA)) %>% 
+    # Suppression des groupes
+    ungroup -> 
+    TraitsBoisFeuilles)
 ```
 
-Les traits par espèce sont la hauteur maximale (95<sup>ème</sup>) centile) et la masse des graines:
+Les traits par espèce sont la hauteur maximale (95<sup>ème</sup> centile) et la masse des graines:
 
-```{r, message=FALSE}
+```{r TraitsParEspeces, message=FALSE}
 # Traits par espèce
 (read_csv2(file="data/DataLifeTraits.csv") %>% 
-  # Sélection des traits
-  select(Name, Hauteur, Masse) %>% 
-  # Préparation de la fusion: noms de colonnes identiques
-  rename(spName = Name) %>% 
-  # Masse des graines: facteurs ordonnés 
-  mutate(MasseGraine = ordered(Masse)) %>% 
-  # Suppression de la colonne originale
-  select(-Masse) ->
-  TraitsVie)
+    # Sélection des traits
+    select(Name, Hauteur, Masse) %>% 
+    # Préparation de la fusion: noms de colonnes identiques
+    rename(spName = Name) %>% 
+    # Masse des graines: facteurs ordonnés 
+    mutate(MasseGraine = ordered(Masse)) %>% 
+    # Suppression de la colonne originale
+    select(-Masse) ->
+    TraitsVie)
 ```
 
 La jointure des tables par les valeurs identiques de la colonne `spName` commune aux deux tibbles termine l'opération:
 
-```{r, message=FALSE}
+```{r TraitsBoisFeuilles, message=FALSE}
 TraitsBoisFeuilles %>% 
   left_join(TraitsVie)->
   Traits
@@ -401,8 +423,8 @@ TraitsBoisFeuilles %>%
 
 La liste des traits ne contient pas forcément toutes les espèces de la parcelle 6 (mais en contient des centaines d'autres, inutiles ici).
 Les espèces manquantes doivent être ajoutées:
-
-```{r}
+  
+```{r, exercise.setup="Comptage"}
 EspecesManquantes <- setdiff(names(AbdP6), Traits$spName)
 # Préparation des lignes supplémentaires
 Paracou6 %>% 
@@ -429,7 +451,7 @@ apply(Traits, 1, function(x) sum(is.na(x))) %>%
   # Division par le nombre de traits pour obtenir une proportion
   `/`(4) %>%
   # Création d'un tibble à une seule colonne
-  as_tibble_col(column_name="Traitsmanquants") %>%
+as_tibble_col(column_name="Traitsmanquants") %>%
   # Ajout au tableau des traits
   bind_cols(Traits) %>%
   # Jointure interne avec le tibble des abondances
@@ -458,8 +480,8 @@ Traits %>%
 
 Le calcul prend plusieurs minutes et n'est donc pas réalisé à chaque exécution du tutoriel.
 Son résultat est lu dans le fichier de sauvegarde:
-
-```{r, echo=TRUE}
+  
+```{r, message=FALSE}
 read_csv2("data/traits.csv") -> Traits
 ```
 
@@ -468,7 +490,7 @@ read_csv2("data/traits.csv") -> Traits
 
 La distance de Gower (cours: section 6.3) est calculée entre les espèces.
 
-```{r}
+```{r Gower}
 library("cluster")
 # Utilisation d'un dataframe pour nommer les lignes
 dfTraits <- as.data.frame(Traits)
@@ -488,15 +510,14 @@ ggplot(data=data.frame(Distance=as.numeric(DistEspeces))) +
 ```
 
 La dissimilarité $\mathbf{Z}$ est calculée comme le complément à la distance maximale normalisée:
-
-```{r}
+  
+```{r Dissimilarités}
 # Dissimilarités
 DistEspeces %<>% as.matrix
 Z <- 1 - DistEspeces/max(DistEspeces)
 ```
 
-
-## Profil de diversité fonctionnelle
+### Profil de diversité fonctionnelle
 
 Afficher le profil de diversité de Leinster et Cobbold.
 
@@ -510,30 +531,29 @@ CommunityProfile(Dqz, AbdP6, Z=Z) %>%
 ```{r phylo-quiz, echo=FALSE}
 quiz(
   question("Quelles sont les contraintes de l'arbre phylogénétique pour définir la diversité ?",
-    answer("Il doit être ultramétrique", correct = TRUE),
-    answer("Il doit être de hauteur 1"),
-    answer("Il ne doit pas avoir de polytomies", correct = TRUE),
-    allow_retry = TRUE
+           answer("Il doit être ultramétrique", correct = TRUE),
+           answer("Il doit être de hauteur 1"),
+           answer("Il ne doit pas avoir de polytomies", correct = TRUE),
+           allow_retry = TRUE
   ),
   question("L'abre peut représenter des distances quelconques, pas forcément une phylogénie",
-    answer("Vrai", correct = TRUE),
-    answer("Faux")
+           answer("Vrai", correct = TRUE),
+           answer("Faux")
   ),
   question("La diversité phylogénétique est la moyenne le long de l'arbre de la diversité à chaque période",
-    answer("Vrai"),
-    answer("Faux : c'est vrai pour l'entropie, mais la transformation en diversité n'est pas linéaire", correct = TRUE),
-    answer("Faux : ce n'est pas vrai pour l'entropie non plus")
+           answer("Vrai"),
+           answer("Faux : c'est vrai pour l'entropie, mais la transformation en diversité n'est pas linéaire", correct = TRUE),
+           answer("Faux : ce n'est pas vrai pour l'entropie non plus")
   )
 )
 ```
 
 
+## Décomposition
 
-# Décomposition
+### Création d'une métacommunauté
 
-## Création d'une métacommunauté
-
-### Préparation d'un dataframe
+#### Préparation d'un dataframe
 
 Chaque carré de la parcelle 6 est considéré comme une communauté locale issue de la méta-communauté constituée par la parcelle entière.
 Un dataframe contenant les espèces en ligne et les communautés en colonnes est d'abord créé.
@@ -543,7 +563,7 @@ Paracou6 %>%
   # Regroupement
   group_by(SubPlot, spName) %>% 
   # Nombres d'arbres par espèces et par carré
-  summarize(Abondance = n(), .groups = "drop") %>% 
+summarize(Abondance = n(), .groups = "drop") %>% 
   # Une colonne par carré
   spread(key = SubPlot, value = Abondance, fill=0)  %>% 
   # Format dataframe pour nommer les lignes
@@ -558,7 +578,7 @@ colnames(dfAbdP6Carres) <- paste("C", colnames(dfAbdP6Carres), sep="")
 ```
 
 
-### Création de la métacommunauté
+#### Création de la métacommunauté
 
 La communauté est créée par la fonction `MetaCommunity()`.
 Les noms de lignes du dataframe sont facultatifs mais permettent de savoir à quelle espèce les abondances se rapportent.
@@ -571,7 +591,7 @@ Paracou6MC <- MetaCommunity(dfAbdP6Carres, Weights = colSums(dfAbdP6Carres))
 Les poids des communautés peuvent être quelconques mais les estimateurs utilisables par la suite sont restreints si les poids ne sont pas les abondances.
 
 
-## Partition de la diversité
+### Partition de la diversité
 
 Afficher les profils de diversité $\alpha$, $\beta$ et $\gamma$ de la parcelle 6 découpée en carrés.
 Afficher les valeurs.
@@ -588,21 +608,22 @@ Attribuer le même poids à toutes les communautés et recalculer la diversité.
 ```{r divpart-quiz, echo=FALSE}
 quiz(
   question("Comment sont organisées les données pour créer une métacommunauté ?",
-    answer("Dans un dataframe", correct = TRUE),
-    answer("Dans une matrice"),
-    answer("Une colonne par communauté et une ligne par espèce", correct = TRUE),
-    answer("Une colonne par espèce et une ligne par communauté"),
-    allow_retry = TRUE
+           answer("Dans un dataframe", correct = TRUE),
+           answer("Dans une matrice"),
+           answer("Une colonne par communauté et une ligne par espèce", correct = TRUE),
+           answer("Une colonne par espèce et une ligne par communauté"),
+           allow_retry = TRUE
   ),
   question("La diversité alpha est la moyenne pondérée des diversités des communautés",
-    answer("Vrai", correct = TRUE),
-    answer("Faux"),
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/10-cadre.html#d%C3%A9composition-de-la-diversit%C3%A9)."
+           answer("Vrai", correct = TRUE),
+           answer("Faux"),
+           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/10-cadre.html#d%C3%A9composition-de-la-diversit%C3%A9)."
   ),
   question("La diversité gamma est le produit des diversités alpha et beta",
-    answer("Vrai", correct = TRUE),
-    answer("Faux"),
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/12-chap-DedompHCDT.html)."
+           answer("Vrai", correct = TRUE),
+           answer("Faux"),
+           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/12-chap-DedompHCDT.html)."
   )
 )
 ```
+
