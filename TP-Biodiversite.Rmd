@@ -31,6 +31,7 @@ theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
 knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 
 # Packages for this document
+remotes::install_github("EcoFoG/EcoFoG")
 InstallPackages(c("entropart", "ape", "cluster", "SPECIES"))
 ```
 
@@ -44,17 +45,103 @@ Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diap
 
 ## Données
 
+```{r setup, include=FALSE}
+# Données disponibles pour tous les exercices
+
+# Paracou6 : lecture de la base de données de Paracou. 
+library("tidyverse")
+library("entropart")
+library("EcoFoG")
+# Lecture de la base de données
+Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
+  # Arbres vivants seulement
+  filter(Plot==6 & CodeAlive == TRUE) %>% 
+  # Filtrage des colonnes utiles
+  select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
+  # Suppression des mentions de sous-espèces
+  # Coupure au premier espace, nouveau champ : species
+  mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
+  # Création d'une colonne contenant "Genre espèce".
+  unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
+# Affichage des données disponibles
+Paracou6
+
+# AbdP6 : nombre d'arbres par espèce.
+Paracou6 %>% 
+  group_by(spName) %>% 
+  summarize(Abondance = n(), .groups = 'drop') ->
+  # Tibble
+  tblAbdP6
+# Fabrication d'un vecteur nommé
+AbdP6 <- tblAbdP6$Abondance
+names(AbdP6) <- tblAbdP6$spName
+# Vecteur d'abondances
+library("entropart")
+AbdP6 %>% as.AbdVector -> AbdP6
+
+# p6Phylo : Phylogénie.
+library("ape")
+library("magrittr")
+Paracou6 %>%
+  select(Family, Genus, spName) %>% 
+  # Nécessite des facteurs
+  mutate_if(is.character, as.factor)  %>% 
+  # Création de la phylogénie
+  {as.phylo(~Family/Genus/spName, data=., collapse=FALSE)} %>% 
+  # Longueurs des branches identiques
+  compute.brlen(method=1) %>% 
+  # Transformer les multichotomies en dichotomies
+  multi2di  %>%  
+  # Fusionner les branches sans divergence 
+  collapse.singles ->
+  p6Phylo
+
+# Z : matrice de similarité. Chunks Trait, Gower et Dissimilarites
+read_csv2("data/traits.csv") -> Traits
+library("cluster")
+# Utilisation d'un dataframe pour nommer les lignes
+dfTraits <- as.data.frame(Traits)
+rownames(dfTraits) <- Traits$spName
+dfTraits %>% 
+  # Ne garder que les espèces de la P6
+  filter(spName %in% names(AbdP6)) %>% 
+  # Ne garder que les valeurs de traits
+  select(-(Family:spName)) %>% 
+  # Calculer la distance entre lignes
+  daisy(metric="gower") ->
+  DistEspeces
+# Dissimilarités
+DistEspeces %<>% as.matrix
+Z <- 1 - DistEspeces/max(DistEspeces)
+
+# dfAbdP6Carres : abondances par carré.
+Paracou6 %>% 
+  # Regroupement
+  group_by(SubPlot, spName) %>% 
+  # Nombres d'arbres par espèces et par carré
+  summarize(Abondance = n(), .groups = "drop") %>% 
+  # Une colonne par carré
+  spread(key = SubPlot, value = Abondance, fill=0)  %>% 
+  # Format dataframe pour nommer les lignes
+  as.data.frame ->
+  dfAbdP6Carres
+# Préparation d'une metacommunauté : noms de lignes
+rownames(dfAbdP6Carres) <- dfAbdP6Carres$spName
+# Suppression de la colonne contenant les noms d'espèces
+dfAbdP6Carres <- dfAbdP6Carres[, -1]
+# Nom des colonnes : C1, C2, C3 et C4
+colnames(dfAbdP6Carres) <- paste("C", colnames(dfAbdP6Carres), sep="")
+```
+
 ### Lecture de la base de Paracou
 
 Inventaire de 2016. 
 La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'avoir les droits suffisants.
 Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées par défaut.
 
-```{r setup, message=FALSE}
+```{r Paracou6}
 library("tidyverse")
 library("entropart")
-if (!"EcoFoG" %in% installed.packages()[, 1])
-  remotes::install_github("EcoFoG/EcoFoG", build_vignettes = TRUE)
 library("EcoFoG")
 # Lecture de la base de données
 Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
@@ -70,6 +157,8 @@ Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
 # Affichage des données disponibles
 Paracou6
 ```
+
+
 
 
 ### Carte
@@ -89,7 +178,7 @@ Paracou6 %>% filter(Genus=="Eperua") %>%
 
 Il faut tout d'abord créer le vecteur des abondances
 
-```{r Comptage}
+```{r AbdP6}
 # Comptage
 Paracou6 %>% 
   group_by(spName) %>% 
@@ -104,12 +193,9 @@ library("entropart")
 AbdP6 %>% as.AbdVector -> AbdP6
 ```
 
-```{r ComptageVisible, ref.label="Comptage"}
-```
-
 Produire un diagramme de Whittaker avec ggplot, en ajustant une distribution lognormale.
 
-```{r Whittaker, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
+```{r Whittaker, exercise=TRUE, hint=TRUE}
 library("entropart")
 
 ```
@@ -125,7 +211,7 @@ library("entropart")
 
 Compter le nombre d'espèces à partir du vecteur d'abondance: penser à éliminer les zéros s'il y en a.
 
-```{r Richesse1, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
+```{r Richesse1, exercise=TRUE, hint=TRUE}
 
 
 ```
@@ -137,7 +223,7 @@ sum(AbdP6 > 0)
 
 Combien y a-t-il de singletons et doubletons dans la communauté ?
 
-```{r Singletons, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
+```{r Singletons, exercise=TRUE, hint=TRUE}
 
 ```
 
@@ -147,13 +233,13 @@ sum(AbdP6 == 1)
 
 Utiliser la fonction `Richness()` de **entropart**.
 
-```{r Richesse2, exercise.setup="Comptage", exercise=TRUE}
+```{r Richesse2, exercise=TRUE}
 AbdP6 %>%  Richness(Correction = "None")
 ```
 
 Estimer la richesse avec les estimateurs de Chao et Jackknife
 
-```{r Richesse3, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
+```{r Richesse3, exercise=TRUE, hint=TRUE}
 
 ```
 
@@ -170,7 +256,7 @@ Pour forcer l'ordre 1, l'argument `JackMax=1` peut être utilisé.
 Obtenir l'intervalle de confiance à 95% de l'estimateur Jackknife 2 avec le package **SPECIES**.
 Les données sont obligatoirement les fréquences des abondances, c'est-à-dire le nombre d'espèces représentées par chaque nombre d'individus.
 
-```{r SPECIES, exercise.setup="Comptage", exercise=TRUE}
+```{r SPECIES, exercise=TRUE}
 library("SPECIES")
 AbdP6 %>% AbdFreqCount() %>% jackknife(k=2) %$% CI
 ```
@@ -209,14 +295,14 @@ quiz(
 
 Estimer l'entropie et la diversité de Shannon de la parcelle 6 avec le meilleur estimateur.
 
-```{r Shannon1, exercise.setup="Comptage", exercise=TRUE}
+```{r Shannon1, exercise=TRUE}
 AbdP6 %>% Shannon()
 AbdP6 %>% Diversity(q=1)
 ```
 
 Comparer l'estimation de la diversité avec celles de l'estimateur "ChaoJost" et de l'estimateur naïf.
 
-```{r Shannon2, exercise.setup="Comptage", exercise=TRUE, hint=TRUE}
+```{r Shannon2, exercise=TRUE, hint=TRUE}
 AbdP6 %>% Diversity(q=1, Correction="ChaoJost")
 AbdP6 %>% Diversity(q=1, Correction="None")
 ```
@@ -224,7 +310,7 @@ AbdP6 %>% Diversity(q=1, Correction="None")
 Le biais d'estimation diminue avec l'ordre de la diversité. 
 Il est très faible pour la diversité de Simpson: le vérifier.
 
-```{r Diversityq2, exercise.setup="Comptage", exercise=TRUE}
+```{r Diversityq2, exercise=TRUE}
 AbdP6 %>% Diversity(q=2)
 # Compléter le code
 ```
@@ -237,13 +323,13 @@ L'ordre du Jackknife appliqué à l'estimation de la richesse ne peut pas être 
 
 Tracer le profil de diversité de la parcelle 6 avec le meilleur estimateur.
 
-```{r Profil1, exercise.setup="Comptage", exercise=TRUE}
+```{r Profil1, exercise=TRUE}
 CommunityProfile(Diversity, AbdP6) %>% autoplot
 ```
 
 Comparer avec le profil estimé naïvement.
 
-```{r Profil2, exercise.setup="Comptage", exercise=TRUE, message=FALSE}
+```{r Profil2, exercise=TRUE, message=FALSE}
 CommunityProfile(Diversity, AbdP6) %>% autoplot -> CPbest
 CommunityProfile(Diversity, AbdP6, Correction="None") %>% autoplot -> CPnone
 library("gridExtra")
@@ -257,21 +343,21 @@ La diversité peut être estimée à un niveau arbitraire de l'effort d'échanti
 
 Estimer la diversité observée avec un hectare d'inventaire (la parcelle mesure 6,25 ha).
 
-```{r Leveln, exercise.setup="Comptage", exercise=TRUE}
+```{r Leveln, exercise=TRUE}
 Diversity(AbdP6, Level=round(sum(AbdP6)/6.25))
 # Estimer la richesse plutôt que Shannon
 ```
 
 Estimer le taux de couverture de l'inventaire.
 
-```{r Coverage, exercise.setup="Comptage", exercise=TRUE}
+```{r Coverage, exercise=TRUE}
 Coverage(AbdP6)
 ```
 
 Estimer la diversité pour un taux de couverture de 99% et la comparer à la diversité asymptotique (taux de couverture de 100%).
 Estimer la richesse pour évaluer le nombre d'espèces correspondant au dernier pourcent de taux de couverture.
 
-```{r LevelC, exercise.setup="Comptage", exercise=TRUE}
+```{r LevelC, exercise=TRUE}
 Diversity(AbdP6, Level=0.99)
 Diversity(AbdP6)
 # Estimer la richesse plutôt que Shannon
@@ -280,7 +366,7 @@ Diversity(AbdP6)
 
 Tracer la courbe d'accumulation de la richesse jusqu'au double de la taille de l'inventaire.
 
-```{r DivAC, exercise.setup="Comptage", exercise=TRUE, exercise.timelimit=120}
+```{r DivAC, exercise=TRUE, exercise.timelimit=120}
 AbdP6 %>% DivAC(q=1, n.seq=seq(from=1, to=2*sum(AbdP6), by=100)) %>% autoplot
 # Essayer q=1 et q=2, by=500 pour accélérer le calcul
 ```
@@ -327,19 +413,17 @@ Paracou6 %>%
   {as.phylo(~Family/Genus/spName, data=., collapse=FALSE)} %>% 
   # Longueurs des branches identiques
   compute.brlen(method=1) %>% 
-  # Fusionner les branches sans divergence
-  collapse.singles %>% 
   # Transformer les multichotomies en dichotomies
-  multi2di -> 
+  multi2di  %>%  
+  # Fusionner les branches sans divergence 
+  collapse.singles ->
   p6Phylo
 ```
 
-```{r p6PhyloVisible, ref.label="Comptage"}
-```
 
 Afficher la phylogénie.
 
-```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120, exercise.setup="p6Phylo"}
+```{r phylogenie, exercise=TRUE, hint=TRUE, exercise.timelimit=120}
 
 ```
 
@@ -352,7 +436,7 @@ p6Phylo %>% plot(type="fan", show.tip.label = FALSE)
 
 Estimer la diversité phylogénétique de Shannon de la parcelle 6 avec le meilleur estimateur et afficher un graphique.
 
-```{r phyShannon, exercise.setup="p6Phylo", exercise=TRUE, exercise.timelimit=120}
+```{r phyShannon, exercise=TRUE, exercise.timelimit=120}
 AbdP6 %>% PhyloDiversity(q=1, Tree=p6Phylo) -> phyShannon6
 phyShannon6 %>% summary
 # Compléter le code
@@ -363,7 +447,7 @@ Interpréter ce graphique.
 Tracer le profil de diversité phylogénétique.
 Réduire le nombre de points dans `q.seq` et remplacer `autoplot` par `plot` si le temps de calcul autorisé est dépassé.
 
-```{r phyProfil, exercise.setup="p6Phylo", exercise=TRUE, exercise.timelimit=120}
+```{r phyProfil, exercise=TRUE, exercise.timelimit=120}
 CommunityProfile(function(X, ...) PhyloDiversity(X, ...)$Total, 
                  AbdP6, q.seq=seq(from=0, to=2, by=1), Tree=p6Phylo) %>% 
   autoplot
@@ -383,7 +467,7 @@ Les traits individuels sont la densité du bois et le logarithme de la surface f
   
 ```{r TraitsIndividuels, message=FALSE}
 # Traits individuels
-(read_csv(file="data/ind_traits_MICE.csv") %>% 
+(read_csv2(file="data/ind_traits_MICE.csv") %>% 
     # Conserver: botanique, densité du bois, SLA
     select(Family:Species, plot_code, sapwood_dens, log_SLA) %>% 
     # Créer le nom d'espèce
@@ -417,14 +501,14 @@ La jointure des tables par les valeurs identiques de la colonne `spName` commune
 
 ```{r TraitsBoisFeuilles, message=FALSE}
 TraitsBoisFeuilles %>% 
-  left_join(TraitsVie)->
+  left_join(TraitsVie) ->
   Traits
 ```
 
 La liste des traits ne contient pas forcément toutes les espèces de la parcelle 6 (mais en contient des centaines d'autres, inutiles ici).
 Les espèces manquantes doivent être ajoutées:
   
-```{r, exercise.setup="Comptage"}
+```{r EspecesManquantes}
 EspecesManquantes <- setdiff(names(AbdP6), Traits$spName)
 # Préparation des lignes supplémentaires
 Paracou6 %>% 
@@ -445,7 +529,7 @@ Traits %<>%
 Le tableau des traits contient des valeurs manquantes.
 La proportion des données de traits manquantes, pondérées par le nombre d'individus, est calculée:
 
-```{r}
+```{r TraitsManquants}
 # Nombres de traits manquants pour chaque espèce
 apply(Traits, 1, function(x) sum(is.na(x))) %>%
   # Division par le nombre de traits pour obtenir une proportion
@@ -468,7 +552,7 @@ sum(TraitsP6$Traitsmanquants * TraitsP6$Abondance)/sum(TraitsP6$Abondance)
 Les traits manquants sont complétés par la procédure MICE qui prend en compte toute l'information disponible.
 Le tableau des traits le plus complet possible (non limité aux espèces de la parcelle 6) est utilisé:
 
-```{r, eval=FALSE, echo=TRUE}
+```{r mice, eval=FALSE, echo=TRUE}
 # Remplissage des valeurs manquantes (long calcul)
 library("mice")
 Traits %>% 
@@ -481,7 +565,7 @@ Traits %>%
 Le calcul prend plusieurs minutes et n'est donc pas réalisé à chaque exécution du tutoriel.
 Son résultat est lu dans le fichier de sauvegarde:
   
-```{r, message=FALSE}
+```{r Traits, message=FALSE}
 read_csv2("data/traits.csv") -> Traits
 ```
 
@@ -511,7 +595,7 @@ ggplot(data=data.frame(Distance=as.numeric(DistEspeces))) +
 
 La dissimilarité $\mathbf{Z}$ est calculée comme le complément à la distance maximale normalisée:
   
-```{r Dissimilarités}
+```{r Dissimilarites}
 # Dissimilarités
 DistEspeces %<>% as.matrix
 Z <- 1 - DistEspeces/max(DistEspeces)
@@ -558,7 +642,7 @@ quiz(
 Chaque carré de la parcelle 6 est considéré comme une communauté locale issue de la méta-communauté constituée par la parcelle entière.
 Un dataframe contenant les espèces en ligne et les communautés en colonnes est d'abord créé.
 
-```{r, echo=TRUE}
+```{r dfAbdP6Carres, echo=TRUE}
 Paracou6 %>% 
   # Regroupement
   group_by(SubPlot, spName) %>% 
@@ -626,4 +710,3 @@ quiz(
   )
 )
 ```
-
