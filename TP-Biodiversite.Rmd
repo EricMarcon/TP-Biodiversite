@@ -31,7 +31,6 @@ theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
 knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 
 # Packages for this document
-remotes::install_github("EcoFoG/EcoFoG")
 InstallPackages(c("entropart", "ape", "cluster", "SPECIES"))
 ```
 
@@ -51,20 +50,7 @@ Le [support de cours](https://ericmarcon.github.io/MesuresBioDiv2/) et son [diap
 # Paracou6 : lecture de la base de données de Paracou. 
 library("tidyverse")
 library("entropart")
-library("EcoFoG")
-# Lecture de la base de données
-Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
-  # Arbres vivants seulement
-  filter(Plot==6 & CodeAlive == TRUE) %>% 
-  # Filtrage des colonnes utiles
-  select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
-  # Suppression des mentions de sous-espèces
-  # Coupure au premier espace, nouveau champ : species
-  mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
-  # Création d'une colonne contenant "Genre espèce".
-  unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
-# Affichage des données disponibles
-Paracou6
+Paracou6 <- read_csv2("data/Paracou6.csv")
 
 # AbdP6 : nombre d'arbres par espèce.
 Paracou6 %>% 
@@ -136,24 +122,30 @@ colnames(dfAbdP6Carres) <- paste("C", colnames(dfAbdP6Carres), sep="")
 ### Lecture de la base de Paracou
 
 Inventaire de 2016. 
-La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'avoir les droits suffisants.
+La lecture de la base de Paracou est possible sur le réseau local de Kourou à condition d'utiliser le package EcoFoG et d'avoir les droits suffisants.
 Si ce n'est pas le cas, les données de la parcelle 6 en 2016 sont retournées par défaut.
+
+Si le package EcoFoG n'est pas installé, une copie des données est utilisée.
 
 ```{r Paracou6}
 library("tidyverse")
 library("entropart")
-library("EcoFoG")
-# Lecture de la base de données
-Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
-  # Arbres vivants seulement
-  filter(Plot==6 & CodeAlive == TRUE) %>% 
-  # Filtrage des colonnes utiles
-  select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
-  # Suppression des mentions de sous-espèces
-  # Coupure au premier espace, nouveau champ : species
-  mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
-  # Création d'une colonne contenant "Genre espèce".
-  unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
+if ("EcoFoG" %in% installed.packages()[, 1]) {
+  library("EcoFoG")
+  # Lecture de la base de données
+  Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
+    # Arbres vivants seulement
+    filter(Plot==6 & CodeAlive == TRUE) %>% 
+    # Filtrage des colonnes utiles
+    select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
+    # Suppression des mentions de sous-espèces
+    # Coupure au premier espace, nouveau champ : species
+    mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
+    # Création d'une colonne contenant "Genre espèce".
+    unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
+} else {
+  Paracou6 <- read_csv2("data/Paracou6.csv")
+}
 # Affichage des données disponibles
 Paracou6
 ```
