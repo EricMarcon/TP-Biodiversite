@@ -31,7 +31,7 @@ theme_update(panel.background = element_rect(fill = "transparent", colour = NA),
 knitr::opts_chunk$set(dev.args=list(bg="transparent"))
 
 # Packages for this document
-InstallPackages(c("entropart", "ape", "cluster", "SPECIES"))
+InstallPackages(c("entropart", "ape", "cluster", "SPECIES", "fundiversity"))
 ```
 
 
@@ -129,23 +129,7 @@ Si le package EcoFoG n'est pas installé, une copie des données est utilisée.
 
 ```{r Paracou6}
 library("tidyverse")
-library("entropart")
-if ("EcoFoG" %in% installed.packages()[, 1]) {
-  library("EcoFoG")
-  # Lecture de la base de données
-  Paracou2df("Plot=6 AND CensusYear=2016") %>% # Année 2016
-    # Arbres vivants seulement
-    filter(Plot==6 & CodeAlive == TRUE) %>% 
-    # Filtrage des colonnes utiles
-    select(SubPlot, idTree:Yfield, -Project, -Protocole, Family:Species, CircCorr) %>%
-    # Suppression des mentions de sous-espèces
-    # Coupure au premier espace, nouveau champ : species
-    mutate(species=str_trim(gsub(" \\S+", "", Species))) %>%
-    # Création d'une colonne contenant "Genre espèce".
-    unite(col = spName, Genus, species, remove = FALSE) -> Paracou6
-} else {
-  Paracou6 <- read_csv2("data/Paracou6.csv")
-}
+Paracou6 <- read_csv2("data/Paracou6.csv")
 # Affichage des données disponibles
 Paracou6
 ```
@@ -265,20 +249,20 @@ quiz(
     answer("Jackknife 1 ou 2, le choix n'est pas clair",  correct = TRUE),
     answer("Jackknife 3"),
     allow_retry = TRUE,
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau. \nLe Jacknife 1 est préférable selon Brose et al.(2003) mais l'algorithme de calcul choisit le Jacknife 2."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau. \nLe Jacknife 1 est préférable selon Brose et al.(2003) mais l'algorithme de calcul choisit le Jacknife 2."
   ),
   question("L'estimation est-elle robuste ?",
     answer("oui"),
     answer("non si le Jackknife 2 est utilisé", correct = TRUE),
     allow_retry = TRUE,
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
   ),
   question("Pourquoi ?",
     answer("Le choix de l'ordre du Jackknife n'est pas clair", correct = TRUE),
     answer("La richesse est largement sous-estimée"),
     answer("La variance de l'estimateur augmente avec l'ordre du Jackknife", correct = TRUE),
     allow_retry = TRUE,
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/3-chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/chap-MesuresNeutres.html#techniques-destimation-non-param%C3%A9trique) et essayer à nouveau."
   )
 )
 ```
@@ -369,12 +353,12 @@ quiz(
   question("Le biais d'estimation diminue avec l'ordre de la diversité",
     answer("Vrai",  correct = TRUE),
     answer("Faux"),
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/entropie.html#estimation-de-lentropie)."
   ),
   question("Pourquoi ?",
     answer("L'impact des espèces rares sur la diversité augmente avec q"),
     answer("L'impact des espèces rares sur la diversité diminue avec q", correct = TRUE),
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/entropie.html#estimation-de-lentropie)."
   ),
   question("Quelle est la technique d'estimation de l'estimateur UnveilJ",
     answer("Les probabilités sont estimées avec un modèle élaboré",  correct = TRUE),
@@ -382,7 +366,7 @@ quiz(
     answer("Le nombre d'espèces non observées est estimé par le Jackknife", correct = TRUE),
     answer("Leur distribution est géométrique mais importe peu", correct = TRUE),
     allow_retry = TRUE,
-    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/4-entropie.html#estimation-de-lentropie)."
+    incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/entropie.html#estimation-de-lentropie)."
   )
 )
 ```
@@ -624,6 +608,39 @@ quiz(
 )
 ```
 
+### Approche alternative
+
+Le package *FD* et plus récemment le package *fundiversity* permettent de calculer les indices de diversité fonctionnelle de Villéger et al. (2008): la richesse (FRic), l'équitabilité (FEve) et la divergence (FDiv).
+
+Les données sont préparées ici pour *fundiversity*: l'inventaire des 4 carrés de la parcelle 6 est placé dans un dataframe dont la première colonne contient les noms des sites les les autres les effectifs des espèces.
+Les traits sont dans une matrice dont les noms de lignes sont les noms des espèces et les colonnes contiennent les valeurs des traits.
+
+```{r}
+# Inventaire des carrés.
+Paracou6 %>% 
+  group_by(SubPlot, spName) %>% 
+  summarize(Abondance = n(), .groups = 'drop') %>% 
+  pivot_wider(names_from = spName, values_from = Abondance, values_fill = 0) ->
+  AbdP6_carres
+
+# Traits
+Traits %>% 
+  select(spName:MasseGraine) %>% 
+  # filter(spName %in% names(AbdP6)) %>% 
+  arrange(spName) -> traits
+traits_matrix <- as.matrix(traits[, -1])
+rownames(traits_matrix) <- traits$spName
+
+library("fundiversity")
+# Richesse
+fd_fric(traits_matrix, AbdP6_carres)
+# Divergence
+fd_fdiv(traits_matrix, AbdP6_carres)
+# Equitatibilité
+fd_feve(traits_matrix, AbdP6_carres)
+```
+
+
 
 ## Décomposition
 
@@ -693,12 +710,12 @@ quiz(
   question("La diversité alpha est la moyenne pondérée des diversités des communautés",
            answer("Vrai", correct = TRUE),
            answer("Faux"),
-           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/10-cadre.html#d%C3%A9composition-de-la-diversit%C3%A9)."
+           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/sec-betaCadre.html#sec-betaDecomposition)."
   ),
   question("La diversité gamma est le produit des diversités alpha et beta",
            answer("Vrai", correct = TRUE),
            answer("Faux"),
-           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/12-chap-DedompHCDT.html)."
+           incorrect = "Voir [le cours](https://ericmarcon.github.io/MesuresBioDiv2/chap-DedompHCDT.html)."
   )
 )
 ```
