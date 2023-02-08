@@ -1,6 +1,7 @@
 # Mesure de la Biodiversité : Travaux pratiques
 
-![stability-wip](https://img.shields.io/badge/lifecycle-maturing-blue.svg)
+![stability-stable](https://img.shields.io/badge/lifecycle-stable-brightgreen.svg)
+
 
 Ce TP fonctionne avec **learnr**: exécuter le fichier `TP-Biodiversite.Rmd` dans RStudio ou le lancer sur [shinyapps.io](https://eric-marcon.shinyapps.io/TP-Biodiversite/).
 
